@@ -36,6 +36,9 @@ int main()
     text.setColor(sf::Color(255, 255, 255, 170));
     text.setPosition(250.f, 450.f);
 
+    // Make sure the window's OpenGL context is activated before performing any OpenGL operations
+    window.setActive(true);
+
     // Load an OpenGL texture.
     // We could directly use a sf::Texture as an OpenGL texture (with its Bind() member function),
     // but here we want more control on it (generate mipmaps, ...) so we create a new one from an image
