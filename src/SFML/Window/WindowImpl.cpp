@@ -115,8 +115,10 @@ bool WindowImpl::popEvent(Event& event, bool block)
     if (m_events.empty())
     {
         // Get events from the system
+#ifndef _MSC_VER
         processJoystickEvents();
         processSensorEvents();
+#endif
         processEvents();
 
         // In blocking mode, we must process events until one is triggered
@@ -128,8 +130,10 @@ bool WindowImpl::popEvent(Event& event, bool block)
             while (m_events.empty())
             {
                 sleep(milliseconds(10));
+#ifndef _MSC_VER
                 processJoystickEvents();
                 processSensorEvents();
+#endif
                 processEvents();
             }
         }
