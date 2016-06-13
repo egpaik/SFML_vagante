@@ -83,11 +83,12 @@ WindowImpl* WindowImpl::create(WindowHandle handle)
 WindowImpl::WindowImpl() :
 m_joystickThreshold(0.1f)
 {
+#ifndef _MSC_VER
     // Get the initial joystick states
     JoystickManager::getInstance().update();
     for (unsigned int i = 0; i < Joystick::Count; ++i)
         m_joystickStates[i] = JoystickManager::getInstance().getState(i);
-
+#endif
     // Get the initial sensor states
     for (unsigned int i = 0; i < Sensor::Count; ++i)
         m_sensorValue[i] = Vector3f(0, 0, 0);
