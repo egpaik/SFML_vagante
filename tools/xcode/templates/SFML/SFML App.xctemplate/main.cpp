@@ -1,6 +1,6 @@
 
 //
-// Disclamer:
+// Disclaimer:
 // ----------
 //
 // This code will work only if you selected window, graphics and audio.
@@ -10,14 +10,14 @@
 // computer.
 //
 // Your resource files (images, sounds, fonts, ...) are also copied to your
-// application bundle. To get the path to these resource, use the helper
-// method resourcePath() from ResourcePath.hpp
+// application bundle. To get the path to these resources, use the helper
+// function `resourcePath()` from ResourcePath.hpp
 //
 
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 
-// Here is a small helper for you ! Have a look.
+// Here is a small helper for you! Have a look.
 #include "ResourcePath.hpp"
 
 int main(int, char const**)
@@ -45,7 +45,7 @@ int main(int, char const**)
         return EXIT_FAILURE;
     }
     sf::Text text("Hello SFML", font, 50);
-    text.setColor(sf::Color::Black);
+    text.setFillColor(sf::Color::Black);
 
     // Load a music to play
     sf::Music music;
