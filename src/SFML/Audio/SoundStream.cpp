@@ -41,6 +41,7 @@ namespace sf
 {
 ////////////////////////////////////////////////////////////
 SoundStream::SoundStream() :
+SoundSource(false),
 m_thread          (&SoundStream::streamData, this),
 m_threadMutex     (),
 m_threadStartState(Stopped),

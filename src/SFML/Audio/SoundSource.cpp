@@ -27,23 +27,44 @@
 ////////////////////////////////////////////////////////////
 #include <SFML/Audio/SoundSource.hpp>
 #include <SFML/Audio/ALCheck.hpp>
-
+#include <cassert>
 
 namespace sf
 {
 ////////////////////////////////////////////////////////////
-SoundSource::SoundSource()
+SoundSource::SoundSource(bool doubleSource):
+    m_doubleSource(doubleSource),
+    m_pan(0.f)
 {
-    alCheck(alGenSources(1, &m_source));
-    alCheck(alSourcei(m_source, AL_BUFFER, 0));
+    if (m_doubleSource)
+    {
+        alCheck(alGenSources(2, m_sources));
+        alCheck(alSourcei(m_sources[Left], AL_BUFFER, 0));
+        alCheck(alSourcei(m_sources[Right], AL_BUFFER, 0));
+    }
+    else
+    {
+        alGenSources(1, &m_source);
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
-SoundSource::SoundSource(const SoundSource& copy)
+SoundSource::SoundSource(const SoundSource& copy):
+    m_doubleSource(copy.m_doubleSource),
+    m_pan(copy.m_pan)
 {
-    alCheck(alGenSources(1, &m_source));
-    alCheck(alSourcei(m_source, AL_BUFFER, 0));
+    if (m_doubleSource)
+    {
+        alCheck(alGenSources(2, m_sources));
+        alCheck(alSourcei(m_sources[Left], AL_BUFFER, 0));
+        alCheck(alSourcei(m_sources[Right], AL_BUFFER, 0));
+    }
+    else
+    {
+        alCheck(alGenSources(1, &m_source));
+        alCheck(alSourcei(m_source, AL_BUFFER, 0));
+    }
 
     setPitch(copy.getPitch());
     setVolume(copy.getVolume());
@@ -57,29 +78,82 @@ SoundSource::SoundSource(const SoundSource& copy)
 ////////////////////////////////////////////////////////////
 SoundSource::~SoundSource()
 {
-    alCheck(alSourcei(m_source, AL_BUFFER, 0));
-    alCheck(alDeleteSources(1, &m_source));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcei(m_sources[Left], AL_BUFFER, 0));
+        alCheck(alSourcei(m_sources[Right], AL_BUFFER, 0));
+        alCheck(alDeleteSources(2, m_sources));
+    }
+    else
+    {
+        alCheck(alSourcei(m_source, AL_BUFFER, 0));
+        alCheck(alDeleteSources(1, &m_source));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void SoundSource::setPitch(float pitch)
 {
-    alCheck(alSourcef(m_source, AL_PITCH, pitch));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcef(m_sources[Left], AL_PITCH, pitch));
+        alCheck(alSourcef(m_sources[Right], AL_PITCH, pitch));
+    }
+    else
+    {
+        alCheck(alSourcef(m_source, AL_PITCH, pitch));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void SoundSource::setVolume(float volume)
 {
-    alCheck(alSourcef(m_source, AL_GAIN, volume * 0.01f));
+    if (m_doubleSource)
+    {
+        auto clamp = [](float x, float l, float r)
+        {
+            if (x < l)
+            {
+                return l;
+            }
+            if (x > r)
+            {
+                return r;
+            }
+            return x;
+        };
+        float v = volume * 0.01f;
+
+        float left = clamp(1.f - m_pan, 0.0f, 1.f);
+        float right = clamp(1.f + m_pan, 0.0f, 1.f);
+
+        alCheck(alSourcef(m_sources[Left], AL_GAIN, left * v));
+        alCheck(alSourcef(m_sources[Right], AL_GAIN, right * v));
+    }
+    else
+    {
+        alCheck(alSourcef(m_source, AL_GAIN, volume * 0.01f));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void SoundSource::setPosition(float x, float y, float z)
 {
-    alCheck(alSource3f(m_source, AL_POSITION, x, y, z));
+    if (m_doubleSource)
+    {
+        if (!isRelativeToListener())
+        {
+            alCheck(alSource3f(m_sources[Left], AL_POSITION, x, y, z));
+            alCheck(alSource3f(m_sources[Right], AL_POSITION, x, y, z));
+        }
+    }
+    else
+    {
+        alCheck(alSource3f(m_source, AL_POSITION, x, y, z));
+    }
 }
 
 
@@ -93,29 +167,77 @@ void SoundSource::setPosition(const Vector3f& position)
 ////////////////////////////////////////////////////////////
 void SoundSource::setRelativeToListener(bool relative)
 {
-    alCheck(alSourcei(m_source, AL_SOURCE_RELATIVE, relative));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcei(m_sources[Left], AL_SOURCE_RELATIVE, relative));
+        alCheck(alSourcei(m_sources[Right], AL_SOURCE_RELATIVE, relative));
+
+        if (relative)
+        {
+            alSource3f(m_sources[Left], AL_POSITION, -1.0f, 0.0f, 0.0f);
+            alSource3f(m_sources[Right], AL_POSITION, +1.0f, 0.0f, 0.0f);
+        }
+    }
+    else
+    {
+        alCheck(alSourcei(m_source, AL_SOURCE_RELATIVE, relative));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void SoundSource::setMinDistance(float distance)
 {
-    alCheck(alSourcef(m_source, AL_REFERENCE_DISTANCE, distance));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcef(m_sources[Left], AL_REFERENCE_DISTANCE, distance));
+        alCheck(alSourcef(m_sources[Right], AL_REFERENCE_DISTANCE, distance));
+    }
+    else
+    {
+        alCheck(alSourcef(m_source, AL_REFERENCE_DISTANCE, distance));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void SoundSource::setAttenuation(float attenuation)
 {
-    alCheck(alSourcef(m_source, AL_ROLLOFF_FACTOR, attenuation));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcef(m_sources[Left], AL_ROLLOFF_FACTOR, attenuation));
+        alCheck(alSourcef(m_sources[Right], AL_ROLLOFF_FACTOR, attenuation));
+    }
+    else
+    {
+        alCheck(alSourcef(m_source, AL_ROLLOFF_FACTOR, attenuation));
+    }
 }
 
+////////////////////////////////////////////////////////////
+void SoundSource::setPan(float pan)
+{
+    assert(m_doubleSource);
+    m_pan = pan;
+}
 
+////////////////////////////////////////////////////////////
+float SoundSource::getPan() const
+{
+    return m_pan;
+}
 ////////////////////////////////////////////////////////////
 float SoundSource::getPitch() const
 {
     ALfloat pitch;
-    alCheck(alGetSourcef(m_source, AL_PITCH, &pitch));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcef(m_sources[Left], AL_PITCH, &pitch));
+    }
+    else
+    {
+        alCheck(alGetSourcef(m_source, AL_PITCH, &pitch));
+    }
 
     return pitch;
 }
@@ -125,7 +247,17 @@ float SoundSource::getPitch() const
 float SoundSource::getVolume() const
 {
     ALfloat gain;
-    alCheck(alGetSourcef(m_source, AL_GAIN, &gain));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcef(m_sources[Left], AL_GAIN, &gain));
+        ALfloat gain2;
+        alCheck(alGetSourcef(m_sources[Right], AL_GAIN, &gain2));
+        gain = (gain + gain2) / 2.f;
+    }
+    else
+    {
+        alCheck(alGetSourcef(m_source, AL_GAIN, &gain));
+    }
 
     return gain * 100.f;
 }
@@ -135,7 +267,15 @@ float SoundSource::getVolume() const
 Vector3f SoundSource::getPosition() const
 {
     Vector3f position;
-    alCheck(alGetSource3f(m_source, AL_POSITION, &position.x, &position.y, &position.z));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSource3f(m_sources[Left], AL_POSITION, &position.x, &position.y, &position.z));
+    }
+    else
+    {
+        alCheck(alGetSource3f(m_source, AL_POSITION, &position.x, &position.y, &position.z));
+    }
+
 
     return position;
 }
@@ -145,7 +285,15 @@ Vector3f SoundSource::getPosition() const
 bool SoundSource::isRelativeToListener() const
 {
     ALint relative;
-    alCheck(alGetSourcei(m_source, AL_SOURCE_RELATIVE, &relative));
+
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcei(m_sources[Left], AL_SOURCE_RELATIVE, &relative));
+    }
+    else
+    {
+        alCheck(alGetSourcei(m_source, AL_SOURCE_RELATIVE, &relative));
+    }
 
     return relative != 0;
 }
@@ -155,7 +303,15 @@ bool SoundSource::isRelativeToListener() const
 float SoundSource::getMinDistance() const
 {
     ALfloat distance;
-    alCheck(alGetSourcef(m_source, AL_REFERENCE_DISTANCE, &distance));
+
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcef(m_sources[Left], AL_REFERENCE_DISTANCE, &distance));
+    }
+    else
+    {
+        alCheck(alGetSourcef(m_source, AL_REFERENCE_DISTANCE, &distance));
+    }
 
     return distance;
 }
@@ -165,7 +321,14 @@ float SoundSource::getMinDistance() const
 float SoundSource::getAttenuation() const
 {
     ALfloat attenuation;
-    alCheck(alGetSourcef(m_source, AL_ROLLOFF_FACTOR, &attenuation));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcef(m_sources[Left], AL_ROLLOFF_FACTOR, &attenuation));
+    }
+    else
+    {
+        alCheck(alGetSourcef(m_source, AL_ROLLOFF_FACTOR, &attenuation));
+    }
 
     return attenuation;
 }
@@ -193,7 +356,14 @@ SoundSource& SoundSource::operator =(const SoundSource& right)
 SoundSource::Status SoundSource::getStatus() const
 {
     ALint status;
-    alCheck(alGetSourcei(m_source, AL_SOURCE_STATE, &status));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcei(m_sources[Left], AL_SOURCE_STATE, &status));
+    }
+    else
+    {
+        alCheck(alGetSourcei(m_source, AL_SOURCE_STATE, &status));
+    }
 
     switch (status)
     {

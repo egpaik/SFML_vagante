@@ -50,7 +50,7 @@ public:
     /// \brief Default constructor
     ///
     ////////////////////////////////////////////////////////////
-    Sound();
+    Sound(bool doubleSource);
 
     ////////////////////////////////////////////////////////////
     /// \brief Construct the sound with a buffer
@@ -58,7 +58,7 @@ public:
     /// \param buffer Sound buffer containing the audio data to play with the sound
     ///
     ////////////////////////////////////////////////////////////
-    explicit Sound(const SoundBuffer& buffer);
+    explicit Sound(bool doubleSource, const SoundBuffer& buffer);
 
     ////////////////////////////////////////////////////////////
     /// \brief Copy constructor

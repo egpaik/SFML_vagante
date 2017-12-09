@@ -179,6 +179,30 @@ public:
     ////////////////////////////////////////////////////////////
     void setAttenuation(float attenuation);
 
+
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Set the pan of the sound
+    ///
+    /// The pan is a value between -1 (full left) and 1 (full right).
+    /// The default value for the pan is 0.
+    ///
+    /// \param pan Pan of the sound
+    ///
+    ////////////////////////////////////////////////////////////
+    void setPan(float pan);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Get the pan of the sound
+    ///
+    /// \return Pan of the sound
+    ///
+    /// \see setPan
+    ///
+    ////////////////////////////////////////////////////////////
+    float getPan() const;
+
     ////////////////////////////////////////////////////////////
     /// \brief Get the pitch of the sound
     ///
@@ -251,14 +275,18 @@ public:
     SoundSource& operator =(const SoundSource& right);
 
 protected:
-
+    enum
+    {
+        Left = 0,
+        Right = 1
+    };
     ////////////////////////////////////////////////////////////
     /// \brief Default constructor
     ///
     /// This constructor is meant to be called by derived classes only.
     ///
     ////////////////////////////////////////////////////////////
-    SoundSource();
+    SoundSource(bool doubleSource);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the current status of the sound (stopped, paused, playing)
@@ -271,7 +299,10 @@ protected:
     ////////////////////////////////////////////////////////////
     // Member data
     ////////////////////////////////////////////////////////////
+    bool m_doubleSource;
+    float m_pan;
     unsigned int m_source; ///< OpenAL source identifier
+    unsigned int m_sources[2]; ///< OpenAL source identifier
 };
 
 } // namespace sf

@@ -33,14 +33,16 @@
 namespace sf
 {
 ////////////////////////////////////////////////////////////
-Sound::Sound() :
+Sound::Sound(bool doubleSource) :
+SoundSource(doubleSource),
 m_buffer(NULL)
 {
 }
 
 
 ////////////////////////////////////////////////////////////
-Sound::Sound(const SoundBuffer& buffer) :
+Sound::Sound(bool doubleSource, const SoundBuffer& buffer) :
+SoundSource(doubleSource),
 m_buffer(NULL)
 {
     setBuffer(buffer);
@@ -70,21 +72,43 @@ Sound::~Sound()
 ////////////////////////////////////////////////////////////
 void Sound::play()
 {
-    alCheck(alSourcePlay(m_source));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcePlayv(2, m_sources));
+    }
+    else
+    {
+        alCheck(alSourcePlay(m_source));
+    }
+    
 }
 
 
 ////////////////////////////////////////////////////////////
 void Sound::pause()
 {
-    alCheck(alSourcePause(m_source));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcePausev(2, m_sources));
+    }
+    else
+    {
+        alCheck(alSourcePause(m_source));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void Sound::stop()
 {
-    alCheck(alSourceStop(m_source));
+    if (m_doubleSource)
+    {
+        alCheck(alSourceStopv(2, m_sources));
+    }
+    else
+    {
+        alCheck(alSourceStop(m_source));
+    }
 }
 
 
@@ -101,21 +125,45 @@ void Sound::setBuffer(const SoundBuffer& buffer)
     // Assign and use the new buffer
     m_buffer = &buffer;
     m_buffer->attachSound(this);
-    alCheck(alSourcei(m_source, AL_BUFFER, m_buffer->m_buffer));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcei(m_sources[Left], AL_BUFFER, m_buffer->m_buffer));
+        alCheck(alSourcei(m_sources[Right], AL_BUFFER, m_buffer->m_buffer));
+    }
+    else
+    {
+        alCheck(alSourcei(m_source, AL_BUFFER, m_buffer->m_buffer));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void Sound::setLoop(bool loop)
 {
-    alCheck(alSourcei(m_source, AL_LOOPING, loop));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcei(m_sources[Left], AL_LOOPING, loop));
+        alCheck(alSourcei(m_sources[Right], AL_LOOPING, loop));
+    }
+    else
+    {
+        alCheck(alSourcei(m_source, AL_LOOPING, loop));
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 void Sound::setPlayingOffset(Time timeOffset)
 {
-    alCheck(alSourcef(m_source, AL_SEC_OFFSET, timeOffset.asSeconds()));
+    if (m_doubleSource)
+    {
+        alCheck(alSourcef(m_sources[Left], AL_SEC_OFFSET, timeOffset.asSeconds()));
+        alCheck(alSourcef(m_sources[Right], AL_SEC_OFFSET, timeOffset.asSeconds()));
+    }
+    else
+    {
+        alCheck(alSourcef(m_source, AL_SEC_OFFSET, timeOffset.asSeconds()));
+    }
 }
 
 
@@ -130,7 +178,14 @@ const SoundBuffer* Sound::getBuffer() const
 bool Sound::getLoop() const
 {
     ALint loop;
-    alCheck(alGetSourcei(m_source, AL_LOOPING, &loop));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcei(m_sources[Left], AL_LOOPING, &loop));
+    }
+    else
+    {
+        alCheck(alGetSourcei(m_source, AL_LOOPING, &loop));
+    }
 
     return loop != 0;
 }
@@ -140,7 +195,14 @@ bool Sound::getLoop() const
 Time Sound::getPlayingOffset() const
 {
     ALfloat secs = 0.f;
-    alCheck(alGetSourcef(m_source, AL_SEC_OFFSET, &secs));
+    if (m_doubleSource)
+    {
+        alCheck(alGetSourcef(m_sources[Left], AL_SEC_OFFSET, &secs));
+    }
+    else
+    {
+        alCheck(alGetSourcef(m_source, AL_SEC_OFFSET, &secs));
+    }
 
     return seconds(secs);
 }
@@ -189,7 +251,15 @@ void Sound::resetBuffer()
     // Detach the buffer
     if (m_buffer)
     {
-        alCheck(alSourcei(m_source, AL_BUFFER, 0));
+        if (m_doubleSource)
+        {
+            alCheck(alSourcei(m_sources[Left], AL_BUFFER, 0));
+            alCheck(alSourcei(m_sources[Right], AL_BUFFER, 0));
+        }
+        else
+        {
+            alCheck(alSourcei(m_source, AL_BUFFER, 0));
+        }
         m_buffer->detachSound(this);
         m_buffer = NULL;
     }
