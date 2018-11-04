@@ -246,6 +246,8 @@ public:
     ////////////////////////////////////////////////////////////
     const Uint8* getPixelsPtr() const;
 
+    Uint8* getModifiablePixelsPtr();
+
     ////////////////////////////////////////////////////////////
     /// \brief Flip the image horizontally (left <-> right)
     ///

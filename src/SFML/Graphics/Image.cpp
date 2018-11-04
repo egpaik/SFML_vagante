@@ -304,6 +304,19 @@ const Uint8* Image::getPixelsPtr() const
     }
 }
 
+Uint8* Image::getModifiablePixelsPtr()
+{
+    if (!m_pixels.empty())
+    {
+        return &m_pixels[0];
+    }
+    else
+    {
+        err() << "Trying to access the pixels of an empty image" << std::endl;
+        return NULL;
+    }
+
+}
 
 ////////////////////////////////////////////////////////////
 void Image::flipHorizontally()
