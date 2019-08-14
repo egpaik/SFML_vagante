@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////
 //
 // SFML - Simple and Fast Multimedia Library
-// Copyright (C) 2007-2017 Laurent Gomila (laurent@sfml-dev.org)
+// Copyright (C) 2007-2019 Laurent Gomila (laurent@sfml-dev.org)
 //
 // This software is provided 'as-is', without any express or implied warranty.
 // In no event will the authors be held liable for any damages arising from the use of this software.
@@ -52,7 +52,7 @@ m_sampleRate      (0),
 m_format          (0),
 m_loop            (false),
 m_samplesProcessed(0),
-m_endBuffers      ()
+m_bufferSeeks     ()
 {
 
 }
@@ -78,7 +78,9 @@ SoundStream::~SoundStream()
 void SoundStream::initialize(unsigned int channelCount, unsigned int sampleRate)
 {
     m_channelCount = channelCount;
-    m_sampleRate   = sampleRate;
+    m_sampleRate = sampleRate;
+    m_samplesProcessed = 0;
+    m_isStreaming = false;
 
     // Deduce the format from the number of channels
     m_format = priv::AudioDevice::getFormatFromChannelCount(channelCount);
@@ -128,11 +130,7 @@ void SoundStream::play()
         stop();
     }
 
-    // Move to the beginning
-    onSeek(Time::Zero);
-
     // Start updating the stream in a separate thread to avoid blocking the application
-    m_samplesProcessed = 0;
     m_isStreaming = true;
     m_threadStartState = Playing;
     m_thread.launch();
@@ -170,9 +168,6 @@ void SoundStream::stop()
 
     // Move to the beginning
     onSeek(Time::Zero);
-
-    // Reset the playing position
-    m_samplesProcessed = 0;
 }
 
 
@@ -264,6 +259,14 @@ bool SoundStream::getLoop() const
 
 
 ////////////////////////////////////////////////////////////
+Int64 SoundStream::onLoop()
+{
+    onSeek(Time::Zero);
+    return 0;
+}
+
+
+////////////////////////////////////////////////////////////
 void SoundStream::streamData()
 {
     bool requestStop = false;
@@ -282,7 +285,7 @@ void SoundStream::streamData()
     // Create the buffers
     alCheck(alGenBuffers(BufferCount, m_buffers));
     for (int i = 0; i < BufferCount; ++i)
-        m_endBuffers[i] = false;
+        m_bufferSeeks[i] = NoLoop;
 
     // Fill the queue
     requestStop = fillQueue();
@@ -342,11 +345,11 @@ void SoundStream::streamData()
                 }
 
             // Retrieve its size and add it to the samples count
-            if (m_endBuffers[bufferNum])
+            if (m_bufferSeeks[bufferNum] != NoLoop)
             {
-                // This was the last buffer: reset the sample count
-                m_samplesProcessed = 0;
-                m_endBuffers[bufferNum] = false;
+                // This was the last buffer before EOF or Loop End: reset the sample count
+                m_samplesProcessed = m_bufferSeeks[bufferNum];
+                m_bufferSeeks[bufferNum] = NoLoop;
             }
             else
             {
@@ -391,6 +394,9 @@ void SoundStream::streamData()
     // Dequeue any buffer left in the queue
     clearQueue();
 
+    // Reset the playing position
+    m_samplesProcessed = 0;
+
     // Delete the buffers
     alCheck(alSourcei(m_source, AL_BUFFER, 0));
     alCheck(alDeleteBuffers(BufferCount, m_buffers));
@@ -398,34 +404,41 @@ void SoundStream::streamData()
 
 
 ////////////////////////////////////////////////////////////
-bool SoundStream::fillAndPushBuffer(unsigned int bufferNum)
+bool SoundStream::fillAndPushBuffer(unsigned int bufferNum, bool immediateLoop)
 {
     bool requestStop = false;
 
-    // Acquire audio data
+    // Acquire audio data, also address EOF and error cases if they occur
     Chunk data = {NULL, 0};
-    if (!onGetData(data))
+    for (Uint32 retryCount = 0; !onGetData(data) && (retryCount < BufferRetries); ++retryCount)
     {
-        // Mark the buffer as the last one (so that we know when to reset the playing position)
-        m_endBuffers[bufferNum] = true;
-
         // Check if the stream must loop or stop
-        if (m_loop)
+        if (!m_loop)
         {
-            // Return to the beginning of the stream source
-            onSeek(Time::Zero);
-
-            // If we previously had no data, try to fill the buffer once again
-            if (!data.samples || (data.sampleCount == 0))
-            {
-                return fillAndPushBuffer(bufferNum);
-            }
-        }
-        else
-        {
-            // Not looping: request stop
+            // Not looping: Mark this buffer as ending with 0 and request stop
+            if (data.samples != NULL && data.sampleCount != 0)
+                m_bufferSeeks[bufferNum] = 0;
             requestStop = true;
+            break;
         }
+
+        // Return to the beginning or loop-start of the stream source using onLoop(), and store the result in the buffer seek array
+        // This marks the buffer as the "last" one (so that we know where to reset the playing position)
+        m_bufferSeeks[bufferNum] = onLoop();
+
+        // If we got data, break and process it, else try to fill the buffer once again
+        if (data.samples != NULL && data.sampleCount != 0)
+            break;
+
+        // If immediateLoop is specified, we have to immediately adjust the sample count
+        if (immediateLoop && (m_bufferSeeks[bufferNum] != NoLoop))
+        {
+            // We just tried to begin preloading at EOF or Loop End: reset the sample count
+            m_samplesProcessed = m_bufferSeeks[bufferNum];
+            m_bufferSeeks[bufferNum] = NoLoop;
+        }
+
+        // We're a looping sound that got no data, so we retry onGetData()
     }
 
     // Fill the buffer if some data was returned
@@ -440,6 +453,11 @@ bool SoundStream::fillAndPushBuffer(unsigned int bufferNum)
         // Push it into the sound queue
         alCheck(alSourceQueueBuffers(m_source, 1, &buffer));
     }
+    else
+    {
+        // If we get here, we most likely ran out of retries
+        requestStop = true;
+    }
 
     return requestStop;
 }
@@ -452,7 +470,9 @@ bool SoundStream::fillQueue()
     bool requestStop = false;
     for (int i = 0; (i < BufferCount) && !requestStop; ++i)
     {
-        if (fillAndPushBuffer(i))
+        // Since no sound has been loaded yet, we can't schedule loop seeks preemptively,
+        // So if we start on EOF or Loop End, we let fillAndPushBuffer() adjust the sample count
+        if (fillAndPushBuffer(i, (i == 0)))
             requestStop = true;
     }
 

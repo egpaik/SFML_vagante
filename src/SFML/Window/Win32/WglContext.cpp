@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////
 //
 // SFML - Simple and Fast Multimedia Library
-// Copyright (C) 2007-2017 Laurent Gomila (laurent@sfml-dev.org)
+// Copyright (C) 2007-2019 Laurent Gomila (laurent@sfml-dev.org)
 //
 // This software is provided 'as-is', without any express or implied warranty.
 // In no event will the authors be held liable for any damages arising from the use of this software.
@@ -66,13 +66,17 @@ void ensureExtensionsInit(HDC deviceContext)
 ////////////////////////////////////////////////////////////
 String getErrorString(DWORD errorCode)
 {
-    std::basic_ostringstream<TCHAR, std::char_traits<TCHAR> > ss;
-    TCHAR errBuff[256];
-    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errBuff, sizeof(errBuff), NULL);
-    ss << errBuff;
-    String errMsg(ss.str());
+    PTCHAR buffer;
+    if (FormatMessage(FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errorCode, 0, reinterpret_cast<LPTSTR>(&buffer), 256, NULL) != 0)
+    {
+        String errMsg(buffer);
+        LocalFree(buffer);
+        return errMsg;
+    }
 
-    return errMsg;
+    std::ostringstream ss;
+    ss << "Error " << errorCode;
+    return String(ss.str());
 }
 
 
@@ -84,20 +88,16 @@ m_deviceContext(NULL),
 m_context      (NULL),
 m_ownsWindow   (false)
 {
+    // TODO: Delegate to the other constructor in C++11
+
     // Save the creation settings
     m_settings = ContextSettings();
-
-    // Make sure that extensions are initialized if this is not the shared context
-    // The shared context is the context used to initialize the extensions
-    if (shared && shared->m_deviceContext)
-        ensureExtensionsInit(shared->m_deviceContext);
 
     // Create the rendering surface (window or pbuffer if supported)
     createSurface(shared, 1, 1, VideoMode::getDesktopMode().bitsPerPixel);
 
     // Create the context
-    if (m_deviceContext)
-        createContext(shared);
+    createContext(shared);
 }
 
 
@@ -112,17 +112,11 @@ m_ownsWindow   (false)
     // Save the creation settings
     m_settings = settings;
 
-    // Make sure that extensions are initialized if this is not the shared context
-    // The shared context is the context used to initialize the extensions
-    if (shared && shared->m_deviceContext)
-        ensureExtensionsInit(shared->m_deviceContext);
-
     // Create the rendering surface from the owner window
     createSurface(owner->getSystemHandle(), bitsPerPixel);
 
     // Create the context
-    if (m_deviceContext)
-        createContext(shared);
+    createContext(shared);
 }
 
 
@@ -137,23 +131,20 @@ m_ownsWindow   (false)
     // Save the creation settings
     m_settings = settings;
 
-    // Make sure that extensions are initialized if this is not the shared context
-    // The shared context is the context used to initialize the extensions
-    if (shared && shared->m_deviceContext)
-        ensureExtensionsInit(shared->m_deviceContext);
-
     // Create the rendering surface (window or pbuffer if supported)
     createSurface(shared, width, height, VideoMode::getDesktopMode().bitsPerPixel);
 
     // Create the context
-    if (m_deviceContext)
-        createContext(shared);
+    createContext(shared);
 }
 
 
 ////////////////////////////////////////////////////////////
 WglContext::~WglContext()
 {
+    // Notify unshared OpenGL resources of context destruction
+    cleanupUnsharedResources();
+
     // Destroy the OpenGL context
     if (m_context)
     {
@@ -591,6 +582,10 @@ void WglContext::createSurface(HWND window, unsigned int bitsPerPixel)
 ////////////////////////////////////////////////////////////
 void WglContext::createContext(WglContext* shared)
 {
+    // We can't create an OpenGL context if we don't have a DC
+    if (!m_deviceContext)
+        return;
+
     // Get a working copy of the context settings
     ContextSettings settings = m_settings;
 
@@ -726,6 +721,15 @@ void WglContext::createContext(WglContext* shared)
             if (wglShareLists(sharedContext, m_context) == FALSE)
                 err() << "Failed to share the OpenGL context: " << getErrorString(GetLastError()).toAnsiString() << std::endl;
         }
+    }
+
+    // If we are the shared context, initialize extensions now
+    // This enables us to re-create the shared context using extensions if we need to
+    if (!shared && m_context)
+    {
+        makeCurrent(true);
+        ensureExtensionsInit(m_deviceContext);
+        makeCurrent(false);
     }
 }
 

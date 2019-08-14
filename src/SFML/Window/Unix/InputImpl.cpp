@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////
 //
 // SFML - Simple and Fast Multimedia Library
-// Copyright (C) 2007-2017 Laurent Gomila (laurent@sfml-dev.org)
+// Copyright (C) 2007-2019 Laurent Gomila (laurent@sfml-dev.org)
 //
 // This software is provided 'as-is', without any express or implied warranty.
 // In no event will the authors be held liable for any damages arising from the use of this software.
@@ -54,20 +54,20 @@ bool InputImpl::isKeyPressed(Keyboard::Key key)
         case Keyboard::RSystem:    keysym = XK_Super_R;      break;
         case Keyboard::Menu:       keysym = XK_Menu;         break;
         case Keyboard::Escape:     keysym = XK_Escape;       break;
-        case Keyboard::SemiColon:  keysym = XK_semicolon;    break;
+        case Keyboard::Semicolon:  keysym = XK_semicolon;    break;
         case Keyboard::Slash:      keysym = XK_slash;        break;
         case Keyboard::Equal:      keysym = XK_equal;        break;
-        case Keyboard::Dash:       keysym = XK_minus;        break;
+        case Keyboard::Hyphen:     keysym = XK_minus;        break;
         case Keyboard::LBracket:   keysym = XK_bracketleft;  break;
         case Keyboard::RBracket:   keysym = XK_bracketright; break;
         case Keyboard::Comma:      keysym = XK_comma;        break;
         case Keyboard::Period:     keysym = XK_period;       break;
         case Keyboard::Quote:      keysym = XK_apostrophe;   break;
-        case Keyboard::BackSlash:  keysym = XK_backslash;    break;
+        case Keyboard::Backslash:  keysym = XK_backslash;    break;
         case Keyboard::Tilde:      keysym = XK_grave;        break;
         case Keyboard::Space:      keysym = XK_space;        break;
-        case Keyboard::Return:     keysym = XK_Return;       break;
-        case Keyboard::BackSpace:  keysym = XK_BackSpace;    break;
+        case Keyboard::Enter:      keysym = XK_Return;       break;
+        case Keyboard::Backspace:  keysym = XK_BackSpace;    break;
         case Keyboard::Tab:        keysym = XK_Tab;          break;
         case Keyboard::PageUp:     keysym = XK_Prior;        break;
         case Keyboard::PageDown:   keysym = XK_Next;         break;
@@ -240,7 +240,7 @@ Vector2i InputImpl::getMousePosition()
 
 
 ////////////////////////////////////////////////////////////
-Vector2i InputImpl::getMousePosition(const Window& relativeTo)
+Vector2i InputImpl::getMousePosition(const WindowBase& relativeTo)
 {
     WindowHandle handle = relativeTo.getSystemHandle();
     if (handle)
@@ -284,7 +284,7 @@ void InputImpl::setMousePosition(const Vector2i& position)
 
 
 ////////////////////////////////////////////////////////////
-void InputImpl::setMousePosition(const Vector2i& position, const Window& relativeTo)
+void InputImpl::setMousePosition(const Vector2i& position, const WindowBase& relativeTo)
 {
     // Open a connection with the X server
     Display* display = OpenDisplay();
@@ -318,7 +318,7 @@ Vector2i InputImpl::getTouchPosition(unsigned int /*finger*/)
 
 
 ////////////////////////////////////////////////////////////
-Vector2i InputImpl::getTouchPosition(unsigned int /*finger*/, const Window& /*relativeTo*/)
+Vector2i InputImpl::getTouchPosition(unsigned int /*finger*/, const WindowBase& /*relativeTo*/)
 {
     // Not applicable
     return Vector2i();
